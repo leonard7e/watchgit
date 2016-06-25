@@ -95,7 +95,7 @@ def parse_app_arguments():
         parser.add_argument('repository', metavar='<local>')
         # parser.add_argument('remote', metavar='<remote>')
         parser.add_argument('-V', '--vcs', dest='vcs', default='git',
-                help='Chosie vcs system. Default will be GIT.')
+                help='Chosie vcs system. Default will be GIT. Possible Values: [git, echo]')
 
     # After defining some subroutines, lets perform argument parsing        
     parser = create_parser()
