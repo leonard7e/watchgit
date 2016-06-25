@@ -160,8 +160,8 @@ def main():
         minute_period = args.period*60 
         while(True):
             # wait 60 secs
-            time.sleep(1) 
-            V.changed_since()
+            time.sleep(60) 
+            
             if ( V.changed_since() > minute_period and V.need_migrate):
                 V.remoteMigrate()
                 
