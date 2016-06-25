@@ -11,19 +11,35 @@ import argparse
 # VCS Systems we can use to backup data
 # 
 
+# Echo for Debugging
 class EchoCVS:
     def __init__(self, repository):
         self.repository = git.Repo(repository)
+        self.lastChange=time.time()
+
+    def timediff(self):
+        return time.time()-self.lastChange
+    
     def fCreated(self, path):
         print("Added:", path)
+        self.lastChange=time.time()
+    
     def fModified(self, path):
         print("Modified:", path)
+        self.lastChange=time.time()
+    
     def fRemoved(self, path):
         print("Removed:", path)
+        self.lastChange=time.time()
+    
     def fRenamed(self, src, dest):
         print("Renamed:", src, dest)
+        self.lastChange=time.time()
+    
     def recordChanges(self):
-        print("Record Changes:", time.localtime())
+        print("Record Changes:", time.ctime())
+        self.lastChange=time.time()
+    
     def remoteMigrate(self):
         print("Migrating")
 
@@ -32,17 +48,31 @@ class GitVersioning:
     def __init__(self, repository):
         self.remoteRepository=remoteUrl
         self.repository = git.Repo(repository)
+        self.lastChange=time.time()
+    
+    def timediff(self):
+        return time.time()-self.lastChange
+    
     def fCreated(self, path):
         self.repository.index.add(path)
+        self.lastChange=time.time()
+    
     def fModified(self, path):
         self.repository.index.add(path)
+        self.lastChange=time.time()
+    
     def fRemoved(self, path):
         self.repository.index.remove(path)
+        self.lastChange=time.time()
+    
     def fRenamed(self, src, dest):
         self.repository.index.move([src,dest])
+        self.lastChange=time.time()
+    
     def recordChanges(self):
-        print("git commit -m", time.localtime())
+        print("git commit -m", time.ctime())
         # self.repository.index.commit( .... )
+    
     def remoteMigrate(self):
         print("git push")
         # self.repository.index.commit( .... )
@@ -66,6 +96,7 @@ def chose_version_handler(args):
 class VcsHandler(pyinotify.ProcessEvent):
     def __init__(self, vcs):
         self.vcs = vcs
+        self.lastChange=time.time()
         
     def process_IN_CREATE(self, event):
         self.vcs.fCreated(event.pathname)
@@ -118,10 +149,11 @@ def main():
         return watch, notifier
 
     def app_loop(args, V, notifier):
+        period = 4*1
         while(True):
-            time.sleep(60*1) # 60*15
+            time.sleep(period) # 60*15
             # test whether we need to commit changes
-            if (True): 
+            if (V.timediff() < period):
                 V.recordChanges()
                 V.remoteMigrate()
                 
