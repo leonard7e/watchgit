@@ -125,7 +125,7 @@ def main():
                 V.recordChanges()
                 V.remoteMigrate()
                 
-                notifier.stop()
+        notifier.stop()
 
     # TODO: Versionierung aus ArgumentParser beziehen.
     args = parse_app_arguments()
