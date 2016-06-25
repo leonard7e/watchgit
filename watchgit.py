@@ -14,68 +14,74 @@ import argparse
 # Echo for Debugging
 class EchoCVS:
     def __init__(self, repository):
-        self.repository = git.Repo(repository)
-        self.lastChange=time.time()
+        self.repository = repository
+        self.change_occured = time.time()
+        self.need_migrate=False
 
-    def timediff(self):
-        return time.time()-self.lastChange
-    
+    def changed_since(self):
+        return time.time()-self.change_occured
+
     def fCreated(self, path):
         print("Added:", path)
-        self.lastChange=time.time()
+        self.change_occured=time.time()
+        self.need_migrate=True
     
     def fModified(self, path):
         print("Modified:", path)
-        self.lastChange=time.time()
+        self.change_occured=time.time()
+        self.need_migrate=True
     
     def fRemoved(self, path):
         print("Removed:", path)
-        self.lastChange=time.time()
+        self.change_occured=time.time()
+        self.need_migrate=True
     
     def fRenamed(self, src, dest):
         print("Renamed:", src, dest)
-        self.lastChange=time.time()
-    
-    def recordChanges(self):
-        print("Record Changes:", time.ctime())
-        self.lastChange=time.time()
-    
+        self.change_occured=time.time()
+        self.need_migrate=True
+        
     def remoteMigrate(self):
+        print("Record Changes:", time.ctime())
         print("Migrating")
+        self.need_migrate=False
 
 
 class GitVersioning:
     def __init__(self, repository):
-        self.remoteRepository=remoteUrl
         self.repository = git.Repo(repository)
-        self.lastChange=time.time()
+        self.change_occured=time.time()
+        self.need_migrate=False
     
-    def timediff(self):
-        return time.time()-self.lastChange
-    
+    def changed_since(self):
+        return time.time()-self.change_occured
+
     def fCreated(self, path):
         self.repository.index.add(path)
-        self.lastChange=time.time()
+        self.change_occured=time.time()
+        self.need_migrate=True
     
     def fModified(self, path):
         self.repository.index.add(path)
-        self.lastChange=time.time()
+        self.change_occured=time.time()
+        self.need_migrate=True
     
     def fRemoved(self, path):
         self.repository.index.remove(path)
-        self.lastChange=time.time()
+        self.change_occured=time.time()
+        self.need_migrate=True
     
     def fRenamed(self, src, dest):
         self.repository.index.move([src,dest])
-        self.lastChange=time.time()
-    
-    def recordChanges(self):
-        print("git commit -m", time.ctime())
-        # self.repository.index.commit( .... )
+        self.change_occured=time.time()
+        self.need_migrate=True
     
     def remoteMigrate(self):
+        print("git commit -m", time.ctime())
+        # self.repository.index.commit( .... )
         print("git push")
         # self.repository.index.commit( .... )
+        self.need_migrate=False
         
 def chose_version_handler(args):
     v = args.vcs
@@ -96,7 +102,7 @@ def chose_version_handler(args):
 class VcsHandler(pyinotify.ProcessEvent):
     def __init__(self, vcs):
         self.vcs = vcs
-        self.lastChange=time.time()
+        self.change_occured=time.time()
         
     def process_IN_CREATE(self, event):
         self.vcs.fCreated(event.pathname)
@@ -127,6 +133,8 @@ def parse_app_arguments():
         # parser.add_argument('remote', metavar='<remote>')
         parser.add_argument('-V', '--vcs', dest='vcs', default='git',
                 help='Chosie vcs system. Default will be GIT. Possible Values: [git, echo]')
+        parser.add_argument('-p', '--period', dest='period', type=int, default=1,
+                help='After <period> amount of minutes passed since last change, watchgit will do a push. Default to 1 minutes')
 
     # After defining some subroutines, lets perform argument parsing        
     parser = create_parser()
@@ -149,17 +157,17 @@ def main():
         return watch, notifier
 
     def app_loop(args, V, notifier):
-        period = 4*1
+        minute_period = args.period*60 
         while(True):
-            time.sleep(period) # 60*15
-            # test whether we need to commit changes
-            if (V.timediff() < period):
-                V.recordChanges()
+            # wait 60 secs
+            time.sleep(1) 
+            V.changed_since()
+            if ( V.changed_since() > minute_period and V.need_migrate):
                 V.remoteMigrate()
                 
         notifier.stop()
 
-    # TODO: Versionierung aus ArgumentParser beziehen.
+    # ---
     args = parse_app_arguments()
     V = chose_version_handler(args)
     handler = VcsHandler( V )
@@ -169,11 +177,5 @@ def main():
     app_loop(args, V, notifier)
 
 
-
-
 if __name__ == '__main__':
     main()
-
-
-# TODO
-# - test whether we need to commit changes
