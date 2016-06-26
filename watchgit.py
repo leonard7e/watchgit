@@ -81,7 +81,8 @@ class GitVersioning:
     
     def fRenamed(self, src, dest):
         print(src, "renamed to", dest)
-        self.repository.index.move([src,dest])
+        self.repository.index.remove([src])
+        self.repository.index.add([dest])
         self.change_occured=time.time()
         self.need_migrate=True
     
