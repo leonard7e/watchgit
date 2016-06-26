@@ -89,8 +89,8 @@ class GitVersioning:
     def remoteMigrate(self):
         print("Migrating changes")
         self.repository.index.commit( time.ctime() )
-        # o = self.repository.remotes['origin']
-        # o.push()
+        o = self.repository.remotes['origin']
+        o.push()
         self.need_migrate=False
         
 def chose_version_handler(args):
