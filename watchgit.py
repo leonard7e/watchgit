@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # WatchGit version 0.0.1
 
+import os
+from os import path
 import time
 import pyinotify
 import git
@@ -11,10 +13,13 @@ import argparse
 # VCS Systems we can use to backup data
 # 
 
-# Echo for Debugging
+# Echo for Debugging --- will be removed in future
+
+
+
 class EchoCVS:
     def __init__(self, repository):
-        self.repository = repository
+        self.repository = path.abspath(repository)
         self.change_occured = time.time()
         self.need_migrate=False
 
@@ -56,35 +61,40 @@ class GitVersioning:
     def changed_since(self):
         return time.time()-self.change_occured
 
-    def fCreated(self, path):
-        self.repository.index.add(path)
+    def fCreated(self, p):
+        print("File created:", p)
+        self.repository.index.add([p])
         self.change_occured=time.time()
         self.need_migrate=True
     
-    def fModified(self, path):
-        self.repository.index.add(path)
+    def fModified(self, p):
+        print("File modified:", p)
+        self.repository.index.add([p])
         self.change_occured=time.time()
         self.need_migrate=True
     
-    def fRemoved(self, path):
-        self.repository.index.remove(path)
+    def fRemoved(self, p):
+        print("File removed:", p)
+        self.repository.index.remove([p])
         self.change_occured=time.time()
         self.need_migrate=True
     
     def fRenamed(self, src, dest):
+        print(src, "renamed to", dest)
         self.repository.index.move([src,dest])
         self.change_occured=time.time()
         self.need_migrate=True
     
     def remoteMigrate(self):
-        print("git commit -m", time.ctime())
-        # self.repository.index.commit( .... )
-        print("git push")
-        # self.repository.index.commit( .... )
+        print("Migrating changes")
+        self.repository.index.commit( time.ctime() )
+        # o = self.repository.remotes['origin']
+        # o.push()
         self.need_migrate=False
         
 def chose_version_handler(args):
     v = args.vcs
+    print("Repository: ", args.repository)
     if v == 'git':
         print("Using GIT")
         return GitVersioning(args.repository)
@@ -133,8 +143,8 @@ def parse_app_arguments():
         # parser.add_argument('remote', metavar='<remote>')
         parser.add_argument('-V', '--vcs', dest='vcs', default='git',
                 help='Chosie vcs system. Default will be GIT. Possible Values: [git, echo]')
-        parser.add_argument('-p', '--period', dest='period', type=int, default=1,
-                help='After <period> amount of minutes passed since last change, watchgit will do a push. Default to 1 minutes')
+        parser.add_argument('-p', '--period', dest='period', type=int, default=15,
+                help='After <period> amount of minutes passed since last change, watchgit will do a push. Default to 15 minutes')
 
     # After defining some subroutines, lets perform argument parsing        
     parser = create_parser()
@@ -147,20 +157,27 @@ def parse_app_arguments():
 
 def main():
     def init_pyinotify(args, watchmanager):        
-        mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_MODIFY | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO
-        watch = watchmanager.add_watch(args.repository, mask, rec=True )
+        watch = watchmanager.add_watch(
+            args.repository, 
+            pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_MODIFY | 
+            pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO, 
+            rec=True,
+            exclude_filter=pyinotify.ExcludeFilter(
+                [ '.*(\.git)'
+                ])
+            )
 
         notifier = pyinotify.ThreadedNotifier(watchmanager, handler)
         notifier.start()
+        #watchmanager.rm_watch(list(watch.values()))
         
-        # watchmanager.rm_watch(watch.values())
         return watch, notifier
 
     def app_loop(args, V, notifier):
         minute_period = args.period*60 
         while(True):
-            # wait 60 secs
-            time.sleep(60) 
+            # wait 30 secs
+            time.sleep(30) 
             
             if ( V.changed_since() > minute_period and V.need_migrate):
                 V.remoteMigrate()
